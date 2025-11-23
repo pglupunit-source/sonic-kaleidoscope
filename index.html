@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sonic Kaleidoscope</title>
+
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background: #000;
             cursor: crosshair;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Courier New', monospace;
         }
         canvas {
             display: block;
@@ -36,137 +38,112 @@
         <h1>THE SONIC KALEIDOSCOPE</h1>
         <p>[ CLICK ANYWHERE TO ACTIVATE ]</p>
     </div>
+
     <canvas id="canvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const overlay = document.getElementById('overlay');
-        
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        const overlay = document.getElementById("overlay");
+
         let width, height;
         let centerX, centerY;
         let mouseX = 0, mouseY = 0;
         let isPlaying = false;
         let hue = 0;
-        
-        // --- AUDIO ENGINE SETUP (Web Audio API) ---
+
         let audioCtx, osc, gainNode, analyser;
-        const waveforms = ['sine', 'triangle', 'sawtooth', 'square'];
+        const waveforms = ["sine", "triangle", "sawtooth", "square"];
         let currentWave = 0;
 
         function initAudio() {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioCtx = new AudioContext();
 
-            // 1. The Oscillator (The sound source)
             osc = audioCtx.createOscillator();
             osc.type = waveforms[currentWave];
 
-            // 2. The Gain Node (Volume control)
             gainNode = audioCtx.createGain();
-            gainNode.gain.value = 0; // Start silent
+            gainNode.gain.value = 0;
 
-            // 3. The Analyser (Connects sound to visuals)
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 256; // Resolution of the audio data
+            analyser.fftSize = 256;
 
-            // Connect the chain: Oscillator -> Gain -> Analyser -> Speakers
             osc.connect(gainNode);
             gainNode.connect(analyser);
             analyser.connect(audioCtx.destination);
 
             osc.start();
             isPlaying = true;
-            overlay.style.opacity = 0; // Hide text
+            overlay.style.opacity = 0;
         }
 
-        // --- VISUAL ENGINE ---
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
             centerX = width / 2;
             centerY = height / 2;
         }
-        window.addEventListener('resize', resize);
+        window.addEventListener("resize", resize);
         resize();
 
-        // Track Mouse
-        window.addEventListener('mousemove', (e) => {
+        window.addEventListener("mousemove", (e) => {
             mouseX = e.clientX;
             mouseY = e.clientY;
 
             if (isPlaying) {
-                // Map X axis to Frequency (Pitch)
-                // Low freq (100Hz) to High freq (1000Hz)
                 const freqPercentage = mouseX / width;
-                const freq = 100 + (freqPercentage * 1000);
+                const freq = 100 + freqPercentage * 1000;
                 osc.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.05);
 
-                // Map Y axis to Volume/Intensity
-                const volPercentage = 1 - (mouseY / height);
+                const volPercentage = 1 - mouseY / height;
                 gainNode.gain.setTargetAtTime(volPercentage * 0.5, audioCtx.currentTime, 0.05);
             }
         });
 
-        // Click interaction
-        window.addEventListener('mousedown', () => {
+        window.addEventListener("mousedown", () => {
             if (!isPlaying) {
                 initAudio();
             } else {
-                // Cycle through instruments
                 currentWave = (currentWave + 1) % waveforms.length;
                 osc.type = waveforms[currentWave];
-                
-                // Flash effect on click
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0,0,width,height);
+
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, width, height);
             }
         });
 
-        // --- THE RENDER LOOP ---
         function draw() {
             requestAnimationFrame(draw);
 
-            // 1. Fade out the previous frame slightly to create "trails"
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
             ctx.fillRect(0, 0, width, height);
 
             if (!isPlaying) return;
 
-            // 2. Get Audio Data
             const bufferLength = analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
-            analyser.getByteTimeDomainData(dataArray); 
-            // ^ This gets the actual waveform shape in real-time
+            analyser.getByteTimeDomainData(dataArray);
 
-            // 3. Kaleidoscope Math
             ctx.lineWidth = 2;
-            hue += 1; // Cycle colors
+            hue += 1;
             ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
 
-            const slices = 12; // Number of "pizza slices" in the kaleidoscope
+            const slices = 12;
             const sliceAngle = (Math.PI * 2) / slices;
-            
-            // We draw the waveform multiple times in a circle
+
             for (let i = 0; i < slices; i++) {
                 ctx.save();
-                
-                // Move to center
                 ctx.translate(centerX, centerY);
-                // Rotate for this slice
                 ctx.rotate(i * sliceAngle);
-                // Add a slow constant rotation for trippiness
-                ctx.rotate(hue * 0.01); 
+                ctx.rotate(hue * 0.01);
 
                 ctx.beginPath();
-                
-                // Draw the sound wave
+
                 for (let j = 0; j < bufferLength; j++) {
-                    const v = dataArray[j] / 128.0; // normalize to 0-2
-                    const y = v * (height/4) + 50; // Radius from center
-                    
-                    // Stretch the wave out
-                    const x = j * 2; 
+                    const v = dataArray[j] / 128.0;
+                    const y = v * (height / 4) + 50;
+                    const x = j * 2;
 
                     if (j === 0) ctx.moveTo(x, y);
                     else ctx.lineTo(x, y);
@@ -176,15 +153,15 @@
                 ctx.restore();
             }
 
-            // 4. Add central glow
-            const radius = (gainNode.gain.value * 100) + 10;
+            const radius = gainNode.gain.value * 100 + 10;
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.fillStyle = `hsl(${hue + 180}, 100%, 50%)`; // Complementary color
+            ctx.fillStyle = `hsl(${hue + 180}, 100%, 50%)`;
             ctx.fill();
         }
 
         draw();
     </script>
+
 </body>
 </html>
